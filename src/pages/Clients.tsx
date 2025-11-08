@@ -1,0 +1,14 @@
+
+
+export default function Clients() {
+
+  return (
+    <div className=" flex flex-col items-center justify-center">
+      <main>
+        <h1 className="on-white"> <br/> Keep Track of Your Clients <br/></h1>
+        <p className="on-white">
+        </p>
+      </main>
+    </div>
+  )
+}

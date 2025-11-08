@@ -1,5 +1,6 @@
 import type { Finger } from "../types/finger";
 import logoSrc from "../assets/transparent-logo-cropped.png";
+import { Link } from "react-router-dom";
 
 type DigitsProps = {
   toes?: boolean; // If true, hide logo (footer)
@@ -7,21 +8,20 @@ type DigitsProps = {
 };
 
 export function Digits({ toes = false, babyhands = false }: DigitsProps) {
-
   const fingers: Finger[] = [
-    { url: "index.html", title: "Home" },
-    { url: "codes.html", title: "Codes" },
-    { url: "vendors.html", title: "Vendors" },
+    { to: "/", title: "Home" },
+    { to: "/calculate", title: "Calculate" },
+    { to: "/clients", title: "Clients" },
     {
-      url: "index.html",
+      to: "/",
       logo: true,
       imgSrc: logoSrc,
       alt: "Seer Service Books logo",
       className: "logo",
     },
-    { url: "account.html", title: "Account" },
-    { url: "about.html", title: "About" },
-    { url: "login.html", title: "Login" },
+    { to: "/vendors", title: "Vendors" },
+    { to: "/codes", title: "Codes" },
+    { to: "/logout", title: "Sign Out" },
   ];
 
   const logoFinger = fingers.find((finger) => finger.logo);
@@ -31,9 +31,9 @@ export function Digits({ toes = false, babyhands = false }: DigitsProps) {
       {/* If babyhands, show logo at top */}
       {babyhands && logoFinger && (
         <>
-        <a href={logoFinger.url} className={logoFinger.className || ""}>
+        <Link to={logoFinger.to} className={logoFinger.className || ""}>
           <img src={logoFinger.imgSrc} alt={logoFinger.alt || "logo"} />
-        </a>
+        </Link>
         <br /></>
       )}
 
@@ -41,9 +41,9 @@ export function Digits({ toes = false, babyhands = false }: DigitsProps) {
       {fingers
         .filter((digit) => !((babyhands || toes) && digit.logo)) // If toes, skip logo
         .map((digit, index) => (
-          <a
+          <Link
             key={index}
-            href={digit.url}
+            to={digit.to}
             className={digit.className || ""}
           >
             {digit.logo && digit.imgSrc ? (
@@ -51,7 +51,7 @@ export function Digits({ toes = false, babyhands = false }: DigitsProps) {
             ) : (
               digit.title
             )}
-          </a>
+          </Link>
         ))}
     </nav>
   );

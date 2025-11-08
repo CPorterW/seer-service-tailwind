@@ -4,7 +4,12 @@ import { useEffect, useState } from 'react';
 import { supabase } from './lib/supabaseClient';
 import { useMediaQuery } from '@mui/material';
 import Auth from './components/Auth';
-import ProfileList from './components/ProfileList';
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import Codes from "./pages/Codes";
+import Vendors from "./pages/Vendors";
+import Calculate from "./pages/Calculate";
+import Clients from "./pages/Clients";
+import Logout from "./components/Logout";
 
 
 export default function App() {
@@ -36,17 +41,28 @@ export default function App() {
       {!session ? (
         <Auth />
       ) : (
-        <>
+            <Router>
+      {/* Navbar stays visible across all pages */}
+      
           <header>
             <Digits toes={false} babyhands={isMobile} />
           </header>
-          <button onClick={() => supabase.auth.signOut()}>Sign Out</button>
-          <ProfileList />
-          <HomePage />
+
+      {/* Define page routes */}
+      <div className="p-6">
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/codes" element={<Codes />} />
+          <Route path="/calculate" element={<Calculate />} />
+          <Route path="/vendors" element={<Vendors />} />
+          <Route path="/clients" element={<Clients />} />
+          <Route path="/logout" element={<Logout setSession={setSession} />} />
+        </Routes>
+      </div>
           <footer>
             <Digits toes={true} />
           </footer>
-        </>
+    </Router>
       )}
     </div>
   );

@@ -1,5 +1,5 @@
 export type Finger = {
-  url: string;
+  to: string;
   title?: string;
   className?: string;
   logo?: boolean;
