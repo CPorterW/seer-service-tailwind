@@ -1,3 +1,4 @@
+import AddressTaxLookup from "../components/AddressSearch";
 
 
 export default function Vendors() {
@@ -8,6 +9,7 @@ export default function Vendors() {
         <h1 className="on-white"> <br/> Keep Track of Your Vendors <br/></h1>
         <p className="on-white">
         </p>
+        <AddressTaxLookup></AddressTaxLookup>
       </main>
     </div>
   )

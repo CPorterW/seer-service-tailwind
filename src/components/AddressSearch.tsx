@@ -19,6 +19,7 @@ export default function AddressTaxLookup() {
       const url = `https://usgeocoder.com/api/get_info.php?address=${encodeURIComponent(
         address
       )}&format=json&zip4=n&api_key=${apiKey}`;
+      
 
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch tax data");
@@ -54,7 +55,7 @@ export default function AddressTaxLookup() {
   };
 
   return (
-    <div className="max-w-lg mx-auto mt-10 p-6 bg-white shadow-md rounded-lg">
+    <div className="mt-10 p-6 bg-white shadow-md rounded-lg" style={{ width: "80vw" }}>
       <h2 className="text-xl font-semibold mb-4 text-gray-800">
         U.S. Address Tax Rate Lookup
       </h2>
