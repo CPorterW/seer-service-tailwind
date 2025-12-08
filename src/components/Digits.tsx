@@ -1,5 +1,5 @@
 import type { Finger } from "../types/finger";
-import logoSrc from "../assets/transparent-logo-cropped.png";
+import logoSrc from "../assets/transparent-logo.png";
 import { Link } from "react-router-dom";
 
 type DigitsProps = {
@@ -10,8 +10,8 @@ type DigitsProps = {
 export function Digits({ toes = false, babyhands = false }: DigitsProps) {
   const fingers: Finger[] = [
     { to: "/", title: "Home" },
-    { to: "/calculate", title: "Calculate" },
-    { to: "/clients", title: "Clients" },
+    { to: "/Atheists", title: "Atheists" },
+    { to: "/OtherChristians", title: "Other Christians" },
     {
       to: "/",
       logo: true,
@@ -19,8 +19,8 @@ export function Digits({ toes = false, babyhands = false }: DigitsProps) {
       alt: "Seer Service Books logo",
       className: "logo",
     },
-    { to: "/vendors", title: "Vendors" },
-    { to: "/codes", title: "Codes" },
+    { to: "/FaithVitamins", title: "Faith Vitamins" },
+    { to: "/SavedTopics", title: "Saved Topics" },
     { to: "/logout", title: "Sign Out" },
   ];
 

@@ -1,18 +1,20 @@
 import { HomePage } from "./pages/HomePage";
 import { Digits } from "./components/Digits";
-import { useEffect, useState } from 'react';
-import { supabase } from './lib/supabaseClient';
 import { useMediaQuery } from '@mui/material';
-import Auth from './components/Auth';
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Codes from "./pages/Codes";
-import Vendors from "./pages/Vendors";
-import Calculate from "./pages/Calculate";
-import Clients from "./pages/Clients";
+import { supabase } from './lib/supabaseClient';
+import Atheists from "./pages/Atheists";
+import OtherChristians from "./pages/OtherChristians";
+import FaithVitamins from "./pages/FaithVitamins";
+import SavedTopics from "./pages/SavedTopics";
+import { useEffect, useState } from "react";
 import Logout from "./components/Logout";
-
+import Auth from "./components/Auth";
 
 export default function App() {
+  /* Watches the width of the screen to rearrange the header. */
+  const isMobile = useMediaQuery('(max-width:600px)');
+
   const [session, setSession] = useState<unknown>(null)
 
   useEffect(() => {
@@ -28,41 +30,34 @@ export default function App() {
 
     return () => listener.subscription.unsubscribe()
   }, [])
-
-  
-  /* Watches the width of the screen to rearrange the header. */
-  const isMobile = useMediaQuery('(max-width:600px)');
-
-
-
   return (
     <div className="flex flex-col items-center justify-center">
 
       {!session ? (
         <Auth />
       ) : (
-            <Router>
-      {/* Navbar stays visible across all pages */}
-      
-          <header>
-            <Digits toes={false} babyhands={isMobile} />
-          </header>
+      <Router>
+        {/* Navbar stays visible across all pages */}
+        
+            <header>
+              <Digits toes={false} babyhands={isMobile} />
+            </header>
 
-      {/* Define page routes */}
-      <div className="p-6">
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/codes" element={<Codes />} />
-          <Route path="/calculate" element={<Calculate />} />
-          <Route path="/vendors" element={<Vendors />} />
-          <Route path="/clients" element={<Clients />} />
+        {/* Define page routes */}
+        <div className="p-6">
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/atheists" element={<Atheists />} />
+            <Route path="/FaithVitamins" element={<FaithVitamins />} />
+            <Route path="/otherchristians" element={<OtherChristians />} />
+            <Route path="/SavedTopics" element={<SavedTopics />} />
           <Route path="/logout" element={<Logout setSession={setSession} />} />
-        </Routes>
-      </div>
-          <footer>
-            <Digits toes={true} />
-          </footer>
-    </Router>
+          </Routes>
+        </div>
+            <footer>
+              <Digits toes={true} />
+            </footer>
+      </Router>
       )}
     </div>
   );

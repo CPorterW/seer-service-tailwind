@@ -32,6 +32,7 @@
     color: var(--color-paragraph-on-white);
     font-family: var(--font-paragraph);
     -webkit-font-smoothing: antialiased;
+    padding-bottom: 75px;
   }
 
   h1,h2,h3,h4,h5 {
@@ -69,7 +70,7 @@ main {
 }
 
 footer {
-    position: absolute;
+    position: fixed;
     bottom: 0;
     width: 100vw;
     min-height: 100px;
@@ -117,6 +118,25 @@ img {
     background-color: transparent;
     text-decoration: none;
     border-radius: 0px;
+}
+
+.fancy-quote {
+  font-style: italic;
+  font-size: 1rem;
+  color: #797979;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 1rem;
+  line-height: 1.6;
+}
+input {
+  width: 100%;
+}
+button {
+  padding: 3px 42px;
+  border-width: .5px;
+  border-radius: 8px;
+  margin: 5px;
 }
 
 
