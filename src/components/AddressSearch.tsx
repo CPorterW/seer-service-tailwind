@@ -2,6 +2,7 @@ import { useState } from "react";
 
 export default function AddressTaxLookup() {
   const [address, setAddress] = useState("");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +30,7 @@ export default function AddressTaxLookup() {
 
       // Sales/use tax data may be in data.salesTax or similar
       setResult(data);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError(err.message || "An error occurred");
     } finally {
