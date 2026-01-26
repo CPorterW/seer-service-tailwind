@@ -1,4 +1,4 @@
-import AddressTaxLookup from "../components/AddressSearch";
+// import AddressTaxLookup from "../components/AddressSearch";
 
 
 export default function FaithVitamins() {
@@ -9,7 +9,7 @@ export default function FaithVitamins() {
         <h1 className="on-white"> <br/> Page Under Construction <br/></h1>
         <p className="on-white">
         </p>
-        <AddressTaxLookup></AddressTaxLookup>
+        {/* <AddressTaxLookup></AddressTaxLookup> */}
       </main>
     </div>
   )
