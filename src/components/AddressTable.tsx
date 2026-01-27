@@ -23,7 +23,7 @@ export default function AddressesPage() {
   }, []);
 
   const columns: ColumnDef<Address>[] = [
-    { accessorKey: "id", header: "ID" },
+    { accessorKey: "name", header: "Name"},
     { accessorKey: "street", header: "Street" },
     { accessorKey: "zipCode", header: "Zip Code" },
     { accessorKey: "lastUsed", header: "Last Used" },

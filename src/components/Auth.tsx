@@ -46,7 +46,7 @@ export default function Auth() {
   }
 
   return (
-    <div style={{ maxWidth: '420px', margin: '50px auto' }}>
+    <div style={{ maxWidth: '420px', margin: '35vh auto', backgroundColor: '#b3c4ca', padding: '10px', borderRadius: '8px'}}>
       <h2>Sign In / Sign Up</h2>
       <form>
         <input
