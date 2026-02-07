@@ -8,8 +8,8 @@ export default function Clients() {
   return (
     <div className=" flex flex-col items-center justify-center">
       <main>
-          <AddressInput></AddressInput>
-          <AddressTable></AddressTable>
+          <AddressInput isVendor={false}></AddressInput>
+          <AddressTable isVendor={false}></AddressTable>
       </main>
     </div>
   )

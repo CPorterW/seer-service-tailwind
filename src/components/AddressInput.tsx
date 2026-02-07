@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { supabase } from '../lib/supabaseClient';
 
-export default function AddressInput() {
+type AddressInputProps = {
+  isVendor: boolean;
+};
+
+export default function AddressInput({ isVendor }: AddressInputProps) {
   const [street, setStreet] = useState("");
   const [zipCode, setZipCode] = useState("");
   const [name, setName] = useState("")
@@ -16,6 +20,7 @@ export default function AddressInput() {
         street: street,
         zip_code: zipCode,
         name: name,
+        is_vendor: isVendor,
       });
 
     if (error) {

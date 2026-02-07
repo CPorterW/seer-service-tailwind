@@ -2,9 +2,14 @@ import { useEffect, useState } from "react";
 import Table from "../components/Table";
 import type { Address } from "../types/address";
 import type { ColumnDef, Row } from "@tanstack/react-table";
-import { getAddresses, deleteAddress } from "../services/addressService";
+import { deleteAddress, getVendors, getClients } from "../services/addressService";
 
-export default function AddressesPage() {
+type AddressesPageProps = {
+  isVendor: boolean;
+};
+
+export default function AddressesPage({ isVendor }: AddressesPageProps) {
+
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [contextRow, setContextRow] = useState<Row<Address> | null>(null);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
@@ -12,7 +17,7 @@ export default function AddressesPage() {
   useEffect(() => {
     async function load() {
       try {
-        const data = await getAddresses();
+        const data = isVendor ? await getVendors() : await getClients();
         setAddresses(data);
       } catch (err) {
         console.error("Failed to load addresses:", err);
@@ -20,13 +25,14 @@ export default function AddressesPage() {
     }
 
     load();
-  }, []);
+  }, [isVendor]);
 
   const columns: ColumnDef<Address>[] = [
     { accessorKey: "name", header: "Name"},
     { accessorKey: "street", header: "Street" },
     { accessorKey: "zipCode", header: "Zip Code" },
     { accessorKey: "lastUsed", header: "Last Used" },
+    { accessorKey: "totalTaxRate", header: "Tax Rate" },
   ];
 
   // ✅ Right-click handler
