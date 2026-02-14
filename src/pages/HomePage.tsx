@@ -7,7 +7,7 @@ export function HomePage() {
       <main>
         <h1 className="on-white"> <br/> Welcome to Seer Service Books! <br/></h1>
         <p className="on-white">
-          This paragraph will contain some sort of welcome blurb, along with some instructions.
+          Start by putting your clients' and vendors' addresses into the clients and vendors pages, then head to the calculate page to input spending and earning and see this month's deductible!
         </p>
       </main>
     </div>

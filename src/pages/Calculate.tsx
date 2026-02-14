@@ -1,8 +1,9 @@
-
-
+import DatePicker from "react-datepicker";
+import { useState } from "react";
+import "react-datepicker/dist/react-datepicker.css";
 
 export default function Calculate() {
-
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   return (
     <div className=" flex flex-col items-center justify-center">
       <main>
@@ -22,6 +23,14 @@ export default function Calculate() {
         <input type="text" placeholder="Total Gross" />
         <p className="on-white">
         Total Net: $27,303.76</p>
+        
+        <p className="on-white">Date:</p>
+        <DatePicker 
+          selected={selectedDate} 
+          onChange={(date: Date | null) => setSelectedDate(date)}
+          dateFormat="MM/yyyy"
+          showMonthYearPicker
+        />
       </main>
     </div>
   )

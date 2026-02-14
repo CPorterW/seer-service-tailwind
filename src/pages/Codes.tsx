@@ -8,7 +8,10 @@ export default function Codes() {
       <main>
         <h1 className="on-white"> <br/> All Your Tax Codes In One Place <br/></h1>
         <p className="on-white">
-          <AddressTable></AddressTable>
+          Vendors:
+          <AddressTable isVendor={true}></AddressTable>
+          Clients:
+          <AddressTable isVendor={false}></AddressTable>
         </p>
       </main>
     </div>
