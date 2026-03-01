@@ -29,6 +29,15 @@ async function getFilteredAddresses(predicate: (a: Address) => boolean) {
 export const getVendors = () => getFilteredAddresses(a => a.isVendor);
 export const getClients = () => getFilteredAddresses(a => !a.isVendor);
 
+export async function getAddressesByMonth(month: number, year: number): Promise<Address[]> {
+  const addresses = await getAddresses();
+  return addresses.filter((a) => {
+    if (!a.createdDateTime) return false;
+    const date = new Date(a.createdDateTime);
+    return date.getMonth() + 1 === month && date.getFullYear() === year;
+  });
+}
+
 export async function createAddress(street: string, zip_code: string, name: string, is_vendor: boolean, total_tax_rate: number) {
   const { data, error } = await supabase
     .from("address")

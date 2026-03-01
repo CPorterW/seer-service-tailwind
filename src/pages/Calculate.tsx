@@ -1,9 +1,10 @@
 import DatePicker from "react-datepicker";
 import { useState } from "react";
 import "react-datepicker/dist/react-datepicker.css";
+import AddressTableFull from "../components/AddressTableFull";
 
 export default function Calculate() {
-  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   return (
     <div className=" flex flex-col items-center justify-center">
       <main>
@@ -15,19 +16,13 @@ export default function Calculate() {
         <input type="text" placeholder="Cost of Materials Purchased Here"/> <br/> <br/> 
         <p className="on-white">
         Per Code:</p>
-        <input type="text" placeholder="Income By Code"/>
-        <p className="on-white">
-        Total Post Deduction: $18,626.68</p> <br/>
-        <p className="on-white">
-        Total Gross:</p>
-        <input type="text" placeholder="Total Gross" />
-        <p className="on-white">
-        Total Net: $27,303.76</p>
+
+        <AddressTableFull month={selectedDate.getMonth() + 1} year={selectedDate.getFullYear()}></AddressTableFull>
         
         <p className="on-white">Date:</p>
-        <DatePicker 
-          selected={selectedDate} 
-          onChange={(date: Date | null) => setSelectedDate(date)}
+        <DatePicker
+          selected={selectedDate}
+          onChange={(date) => date && setSelectedDate(date)}
           dateFormat="MM/yyyy"
           showMonthYearPicker
         />
