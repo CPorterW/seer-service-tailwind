@@ -1,15 +1,18 @@
-import { HomePage } from "./pages/HomePage";
 import { Digits } from "./components/Digits";
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { supabase } from './lib/supabaseClient';
 import { useMediaQuery } from '@mui/material';
 import Auth from './components/Auth';
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Codes from "./pages/Codes";
-import Vendors from "./pages/Vendors";
-import Calculate from "./pages/Calculate";
-import Clients from "./pages/Clients";
-import Logout from "./components/Logout";
+const HomePage = lazy(async () => {
+  const module = await import("./pages/HomePage");
+  return { default: module.HomePage };
+});
+const Codes = lazy(() => import("./pages/Codes"));
+const Vendors = lazy(() => import("./pages/Vendors"));
+const Calculate = lazy(() => import("./pages/Calculate"));
+const Clients = lazy(() => import("./pages/Clients"));
+const Logout = lazy(() => import("./components/Logout"));
 
 
 export default function App() {
@@ -50,14 +53,16 @@ export default function App() {
 
       {/* Define page routes */}
       <div className="p-6">
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/codes" element={<Codes />} />
-          <Route path="/calculate" element={<Calculate />} />
-          <Route path="/vendors" element={<Vendors />} />
-          <Route path="/clients" element={<Clients />} />
-          <Route path="/logout" element={<Logout setSession={setSession} />} />
-        </Routes>
+        <Suspense fallback={<p className="on-white">Loading...</p>}>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/codes" element={<Codes />} />
+            <Route path="/calculate" element={<Calculate />} />
+            <Route path="/vendors" element={<Vendors />} />
+            <Route path="/clients" element={<Clients />} />
+            <Route path="/logout" element={<Logout setSession={setSession} />} />
+          </Routes>
+        </Suspense>
       </div>
           <footer>
             <Digits toes={true} />

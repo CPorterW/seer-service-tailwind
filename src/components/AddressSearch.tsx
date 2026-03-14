@@ -1,13 +1,25 @@
 import { useState } from "react";
+type SalesTax = {
+  state_sales_tax_rate?: string | number;
+  county_sales_tax_rate?: string | number;
+  city_sales_tax_rate?: string | number;
+  total_sales_tax_rate?: string | number;
+};
+
+type TaxLookupResult = {
+  error?: string;
+  salesTax?: SalesTax;
+  data?: {
+    salesTax?: SalesTax;
+  };
+};
 
 export default function AddressTaxLookup() {
   const [address, setAddress] = useState("");
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<TaxLookupResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!address) return;
 
@@ -16,23 +28,18 @@ export default function AddressTaxLookup() {
     setResult(null);
 
     try {
-      const apiKey = import.meta.env.VITE_USGEOCODER_KEY;
-      const url = `https://usgeocoder.com/api/get_info.php?address=${encodeURIComponent(
-        address
-      )}&format=json&zip4=n&api_key=${apiKey}`;
-      
-
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("Failed to fetch tax data");
-      const data = await res.json();
+      const res = await fetch("/api/tax-lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address }),
+      });
+      const data = (await res.json()) as TaxLookupResult;
+      if (!res.ok) throw new Error(data.error || "Failed to fetch tax data");
 
       if (data.error) throw new Error(data.error);
-
-      // Sales/use tax data may be in data.salesTax or similar
       setResult(data);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-      setError(err.message || "An error occurred");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setLoading(false);
     }
@@ -40,7 +47,7 @@ export default function AddressTaxLookup() {
 
   const formatTaxRates = () => {
     if (!result) return null;
-    const tax = result.salesTax || result.data?.salesTax;
+    const tax = result.salesTax ?? result.data?.salesTax;
 
     if (!tax) {
       return <p>No tax rate data found for this address.</p>;
@@ -48,10 +55,10 @@ export default function AddressTaxLookup() {
 
     return (
       <div className="space-y-1">
-        <p><strong>State:</strong> {tax.state_sales_tax_rate}%</p>
-        <p><strong>County:</strong> {tax.county_sales_tax_rate}%</p>
-        <p><strong>City:</strong> {tax.city_sales_tax_rate}%</p>
-        <p><strong>Total:</strong> {tax.total_sales_tax_rate}%</p>
+        <p><strong>State:</strong> {tax.state_sales_tax_rate ?? "N/A"}%</p>
+        <p><strong>County:</strong> {tax.county_sales_tax_rate ?? "N/A"}%</p>
+        <p><strong>City:</strong> {tax.city_sales_tax_rate ?? "N/A"}%</p>
+        <p><strong>Total:</strong> {tax.total_sales_tax_rate ?? "N/A"}%</p>
       </div>
     );
   };

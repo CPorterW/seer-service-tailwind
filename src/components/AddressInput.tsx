@@ -68,8 +68,9 @@ export default function AddressInput({ isVendor }: AddressInputProps) {
         setName("");
       }
 
-    } catch (err: any) {
-      setStatus("Error: " + (err.message || "Failed to get tax rates"));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to get tax rates";
+      setStatus("Error: " + message);
     } finally {
       setLoading(false);
     }

@@ -21,7 +21,7 @@ export async function getTaxRatesByAddress(
     `&authkey=${API_KEY}` +
     `&option=tax_details` +
     `&format=json`;*/
-  const url = `/api?option=tax_details&format=json&address=${encodeURIComponent(address)}&zipcode=${encodeURIComponent(zipcode)}`
+  const url = `/api/usgeocoder?option=tax_details&format=json&address=${encodeURIComponent(address)}&zipcode=${encodeURIComponent(zipcode)}`
 
   console.log("Fetching tax data from:", url);
 
