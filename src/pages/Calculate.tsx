@@ -9,18 +9,16 @@ export default function Calculate() {
       <main>
         <h1 className="on-white"> <br/> Calculate Your Taxes <br/></h1>
         <p className="on-white">
-        Cost of Materials Purchased Per Address:</p>
-        <input type="text" placeholder="Cost of Materials Purchased Here"/> <br/> <br/> 
-        <p className="on-white">
-        Per Code:</p>
-        <Suspense fallback={<p className="on-white">Loading table...</p>}>
-          <AddressTableFull month={selectedDate.getMonth() + 1} year={selectedDate.getFullYear()} />
-        </Suspense>
-        <AddressTableFull month={selectedDate.getMonth() + 1} year={selectedDate.getFullYear()}></AddressTableFull>
-        
+          Use the dropdowns below to add clients and vendors for this month.
+          Enter positive values for money spent and negative values for money made.
+        </p>
         <p className="on-white">Date:</p>
         <Suspense fallback={<p className="on-white">Loading date picker...</p>}>
           <MonthYearPicker selectedDate={selectedDate} onChange={setSelectedDate} />
+        </Suspense>
+        <p className="on-white">Monthly Spending:</p>
+        <Suspense fallback={<p className="on-white">Loading table...</p>}>
+          <AddressTableFull month={selectedDate.getMonth() + 1} year={selectedDate.getFullYear()} />
         </Suspense>
       </main>
     </div>

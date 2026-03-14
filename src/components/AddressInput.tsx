@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { useState } from "react";
 import { getTaxRatesByAddress } from "../services/geocoderService";
+import { createAddress } from "../services/addressService";
 
 
 
@@ -14,23 +14,6 @@ export default function AddressInput({ isVendor }: AddressInputProps) {
   const [name, setName] = useState("");
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
-
-
-  useEffect(() => {
-  async function testGeocoder() {
-    try {
-      const result = await getTaxRatesByAddress(
-        "1600 Pennsylvania Ave NW",
-        "20500"
-      );
-      console.log("Tax result:", result);
-    } catch (err) {
-      console.error("Geocoder error:", err);
-    }
-  }
-
-  testGeocoder();
-}, []);
 
   async function sendToSupabase() {
     if (!street || !zipCode) {
@@ -49,24 +32,18 @@ export default function AddressInput({ isVendor }: AddressInputProps) {
 
       console.log(taxRates);
 
-      // 🔹 Save all info to Supabase
-      const { error } = await supabase.from("address").insert({
-        street: street,
-        zip_code: zipCode,
-        name: name,
-        is_vendor: isVendor,
-        sales_tax_rate: taxRates.salesTaxRate,
-        use_tax_rate: taxRates.useTaxRate,
-      });
+      await createAddress(
+        street,
+        zipCode,
+        name,
+        isVendor,
+        taxRates.salesTaxRate
+      );
 
-      if (error) {
-        setStatus("Error: " + error.message);
-      } else {
-        setStatus("Saved!");
-        setStreet("");
-        setZipCode("");
-        setName("");
-      }
+      setStatus("Saved!");
+      setStreet("");
+      setZipCode("");
+      setName("");
 
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to get tax rates";
