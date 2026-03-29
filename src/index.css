@@ -69,8 +69,7 @@ main {
 }
 
 footer {
-    position: absolute;
-    bottom: 0;
+    margin-top: auto;
     width: 100vw;
     min-height: 100px;
     background-color: var(--color-nav-bg);
@@ -122,6 +121,17 @@ input {
   width: 100%;
   border-width: .5px;
   border-radius: 8px;
+}
+
+.no-number-spinner::-webkit-outer-spin-button,
+.no-number-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.no-number-spinner[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }
 button {
   padding: 3px 42px;

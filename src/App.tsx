@@ -39,34 +39,35 @@ export default function App() {
 
 
   return (
-    <div className="flex flex-col items-center justify-center">
+    <div className="w-full">
 
       {!session ? (
         <Auth />
       ) : (
             <Router>
-      {/* Navbar stays visible across all pages */}
-      
-          <header>
-            <Digits toes={false} babyhands={isMobile} />
-          </header>
+      <div className="min-h-screen flex flex-col">
+        {/* Navbar stays visible across all pages */}
+        <header>
+          <Digits toes={false} babyhands={isMobile} />
+        </header>
 
-      {/* Define page routes */}
-      <div className="p-6">
-        <Suspense fallback={<p className="on-white">Loading...</p>}>
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/codes" element={<Codes />} />
-            <Route path="/calculate" element={<Calculate />} />
-            <Route path="/vendors" element={<Vendors />} />
-            <Route path="/clients" element={<Clients />} />
-            <Route path="/logout" element={<Logout setSession={setSession} />} />
-          </Routes>
-        </Suspense>
+        {/* Define page routes */}
+        <main className="flex-1 p-6">
+          <Suspense fallback={<p className="on-white">Loading...</p>}>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/codes" element={<Codes />} />
+              <Route path="/calculate" element={<Calculate />} />
+              <Route path="/vendors" element={<Vendors />} />
+              <Route path="/clients" element={<Clients />} />
+              <Route path="/logout" element={<Logout setSession={setSession} />} />
+            </Routes>
+          </Suspense>
+        </main>
+        <footer>
+          <Digits toes={true} />
+        </footer>
       </div>
-          <footer>
-            <Digits toes={true} />
-          </footer>
     </Router>
       )}
     </div>

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { getTaxRatesByAddress } from "../services/geocoderService";
 import { createAddress } from "../services/addressService";
 
 
@@ -23,22 +22,8 @@ export default function AddressInput({ isVendor }: AddressInputProps) {
 
     try {
       setLoading(true);
-      setStatus("Getting tax rates...");
-
-      // 🔹 Call geocoder service
-      const taxRates = await getTaxRatesByAddress(street, zipCode);
-
-      setStatus("Saving to database...");
-
-      console.log(taxRates);
-
-      await createAddress(
-        street,
-        zipCode,
-        name,
-        isVendor,
-        taxRates.salesTaxRate
-      );
+      setStatus("Saving address and tax code...");
+      await createAddress(street, zipCode, name, isVendor);
 
       setStatus("Saved!");
       setStreet("");
@@ -46,7 +31,7 @@ export default function AddressInput({ isVendor }: AddressInputProps) {
       setName("");
 
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to get tax rates";
+      const message = err instanceof Error ? err.message : "Failed to save address";
       setStatus("Error: " + message);
     } finally {
       setLoading(false);

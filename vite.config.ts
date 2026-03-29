@@ -43,6 +43,94 @@ function parseAddress(rawBody: string): string | null {
   }
 }
 
+function normalizeServerPath(serverPath: string): string {
+  return serverPath.trim().replace(/\/+$/, "");
+}
+
+function geocoderMiddleware(serverPath: string, authKey: string) {
+  const normalizedServerPath = normalizeServerPath(serverPath);
+  const endpoint = normalizedServerPath.endsWith("/get_info.php")
+    ? normalizedServerPath
+    : `${normalizedServerPath}/get_info.php`;
+
+  return async (
+    req: IncomingMessage,
+    res: ServerResponse<IncomingMessage>,
+    next: MiddlewareNext
+  ) => {
+    const path = req.url?.split("?")[0];
+    if (path !== "/api/usgeocoder") {
+      next();
+      return;
+    }
+
+    if (req.method !== "GET") {
+      sendJson(res, 405, { error: "Method not allowed." });
+      return;
+    }
+
+    if (!normalizedServerPath) {
+      sendJson(res, 500, { error: "Server is missing USGEOCODER_SERVER_PATH." });
+      return;
+    }
+
+    if (!authKey) {
+      sendJson(res, 500, { error: "Server is missing USGEOCODER_KEY." });
+      return;
+    }
+
+    try {
+      const url = new URL(req.url ?? "/api/usgeocoder", "http://localhost");
+      const address = url.searchParams.get("address")?.trim();
+      const zipcode = url.searchParams.get("zipcode")?.trim();
+      const option = url.searchParams.get("option")?.trim();
+
+      if (!address || !zipcode) {
+        sendJson(res, 400, { error: "Both address and zipcode are required." });
+        return;
+      }
+
+      const params = new URLSearchParams({
+        address,
+        zipcode,
+        authkey: authKey,
+        format: "json",
+      });
+      if (option) {
+        params.set("option", option);
+      }
+
+      const upstream = await fetch(`${endpoint}?${params.toString()}`);
+      const payload = await upstream.text();
+
+      res.statusCode = upstream.status;
+      res.setHeader(
+        "Content-Type",
+        upstream.headers.get("content-type") ?? "application/json"
+      );
+      res.end(payload);
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Tax lookup request failed.";
+      sendJson(res, 502, { error: message });
+    }
+  };
+}
+
+function geocoderProxy(serverPath: string, authKey: string): Plugin {
+  const middleware = geocoderMiddleware(serverPath, authKey);
+
+  return {
+    name: "geocoder-proxy",
+    configureServer(server) {
+      server.middlewares.use(middleware);
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(middleware);
+    },
+  };
+}
+
 function taxLookupMiddleware(apiKey: string) {
   return async (
     req: IncomingMessage,
@@ -115,6 +203,12 @@ function taxLookupProxy(apiKey: string): Plugin {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
+  const geocoderServerPath =
+    env.USGEOCODER_SERVER_PATH ||
+    process.env.USGEOCODER_SERVER_PATH ||
+    env.VITE_USGEOCODER_BASE_URL ||
+    process.env.VITE_USGEOCODER_BASE_URL ||
+    "https://api.usgeocoder.com/api";
   const geocoderApiKey =
     env.USGEOCODER_KEY ||
     process.env.USGEOCODER_KEY ||
@@ -123,15 +217,11 @@ export default defineConfig(({ mode }) => {
     "";
 
   return {
-    plugins: [react(), tailwindcss(), taxLookupProxy(geocoderApiKey)],
-    server: {
-      proxy: {
-        "/api/usgeocoder": {
-          target: "https://api.usgeocoder.com/api/sample_info.php",
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api\/usgeocoder/, ""),
-        },
-      },
-    },
+    plugins: [
+      react(),
+      tailwindcss(),
+      geocoderProxy(geocoderServerPath, geocoderApiKey),
+      taxLookupProxy(geocoderApiKey),
+    ],
   };
 });

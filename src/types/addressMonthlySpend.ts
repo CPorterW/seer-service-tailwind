@@ -7,6 +7,7 @@ export interface AddressMonthlySpend {
   lastUsed: string | null;
   isVendor: boolean;
   totalTaxRate: number;
+  taxCode: string | null;
   moneySpent: number;
   month: number;
   year: number;

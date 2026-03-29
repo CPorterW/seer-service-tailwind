@@ -1,5 +1,6 @@
 import { supabase } from "../lib/supabaseClient";
 import { getAddresses } from "./addressService";
+import { getTaxDetailsByAddressForMonth } from "./taxCodeService";
 import type { AddressMonthlySpend } from "../types/addressMonthlySpend";
 
 const ADDRESS_MONTHLY_SPEND_TABLE =
@@ -34,14 +35,19 @@ export async function getAddressMonthlySpend(
   }
 
   const addressIds = addresses.map((address) => address.id);
-
-  const { data: monthlyRows, error } = await supabase
+  const monthlySpendPromise = supabase
     .from(ADDRESS_MONTHLY_SPEND_TABLE)
     .select("id, address_id, money_spent, month, year")
     .eq("month", month)
     .eq("year", year)
     .in("address_id", addressIds)
     .order("id", { ascending: false });
+  const [monthlySpendResult, taxDetailsByAddress] = await Promise.all([
+    monthlySpendPromise,
+    getTaxDetailsByAddressForMonth(addressIds, month, year),
+  ]);
+
+  const { data: monthlyRows, error } = monthlySpendResult;
 
   if (error) throw error;
 
@@ -55,6 +61,7 @@ export async function getAddressMonthlySpend(
 
   return addresses.map((address) => {
     const monthlySpend = spendByAddress.get(address.id);
+    const taxDetails = taxDetailsByAddress.get(address.id);
 
     return {
       id: monthlySpend?.id ?? null,
@@ -64,7 +71,8 @@ export async function getAddressMonthlySpend(
       zipCode: address.zipCode,
       lastUsed: address.lastUsed,
       isVendor: address.isVendor,
-      totalTaxRate: parseNumericValue(address.totalTaxRate),
+      totalTaxRate: taxDetails?.totalTaxRate ?? parseNumericValue(address.totalTaxRate),
+      taxCode: taxDetails?.taxCode ?? null,
       moneySpent: parseNumericValue(monthlySpend?.money_spent),
       month,
       year,

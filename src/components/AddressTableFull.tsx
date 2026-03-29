@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
+import { Autocomplete, TextField } from "@mui/material";
 import Table from "./Table";
 import type { AddressMonthlySpend } from "../types/addressMonthlySpend";
 import {
   getAddressMonthlySpend,
   upsertAddressMonthlySpend,
 } from "../services/addressMonthlySpendService";
+import { ensureMonthlyTaxCodeForAddress } from "../services/taxCodeService";
 
 const getStartOfToday = () => {
   const d = new Date();
@@ -36,6 +38,32 @@ function matchesSearch(address: AddressMonthlySpend, query: string): boolean {
   );
 }
 
+function getDisplayMoneyAmount(value: number): string {
+  if (value === 0) return "0";
+  return String(Math.abs(value));
+}
+
+function parseMoneySpent(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return 0;
+  const normalized = trimmed.replaceAll(",", "").replaceAll("$", "");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeMoneyAmount(value: number, isVendor: boolean): number {
+  if (value === 0) return 0;
+  return isVendor ? Math.abs(value) : -Math.abs(value);
+}
+
+function calculateVendorDeduction(moneySpent: number, totalTaxRate: number): number {
+  return Math.abs(moneySpent) * (Math.abs(totalTaxRate) / 100);
+}
+
+function formatCurrency(value: number): string {
+  return `$${value.toFixed(2)}`;
+}
+
 type AddressesPageProps = {
   month: number;
   year: number;
@@ -48,14 +76,26 @@ export default function AddressesPage({
   const [allAddresses, setAllAddresses] = useState<AddressMonthlySpend[]>([]);
   const [clientRows, setClientRows] = useState<AddressMonthlySpend[]>([]);
   const [vendorRows, setVendorRows] = useState<AddressMonthlySpend[]>([]);
-  const [selectedClientId, setSelectedClientId] = useState("");
-  const [selectedVendorId, setSelectedVendorId] = useState("");
-  const [clientSearch, setClientSearch] = useState("");
-  const [vendorSearch, setVendorSearch] = useState("");
+  const [clientSearchInput, setClientSearchInput] = useState("");
+  const [vendorSearchInput, setVendorSearchInput] = useState("");
   const [draftMoneySpent, setDraftMoneySpent] = useState<Record<number, string>>(
     {}
   );
+  const [dirtyByAddressId, setDirtyByAddressId] = useState<Record<number, boolean>>(
+    {}
+  );
+  const [savingByAddressId, setSavingByAddressId] = useState<Record<number, boolean>>(
+    {}
+  );
   const [status, setStatus] = useState("");
+
+  const draftMoneySpentRef = useRef<Record<number, string>>({});
+  const dirtyByAddressIdRef = useRef<Record<number, boolean>>({});
+  const savingByAddressIdRef = useRef<Record<number, boolean>>({});
+
+  draftMoneySpentRef.current = draftMoneySpent;
+  dirtyByAddressIdRef.current = dirtyByAddressId;
+  savingByAddressIdRef.current = savingByAddressId;
 
   useEffect(() => {
     let active = true;
@@ -70,13 +110,13 @@ export default function AddressesPage({
         setVendorRows(data.filter((address) => address.isVendor && address.id !== null));
         setDraftMoneySpent(
           Object.fromEntries(
-            data.map((address) => [address.addressId, String(address.moneySpent)])
+            data.map((address) => [address.addressId, getDisplayMoneyAmount(address.moneySpent)])
           )
         );
-        setSelectedClientId("");
-        setSelectedVendorId("");
-        setClientSearch("");
-        setVendorSearch("");
+        setClientSearchInput("");
+        setVendorSearchInput("");
+        setDirtyByAddressId({});
+        setSavingByAddressId({});
         setStatus("");
       } catch (err) {
         console.error("Failed to load addresses:", err);
@@ -103,25 +143,7 @@ export default function AddressesPage({
     [allAddresses]
   );
 
-  const filteredClientOptions = useMemo(
-    () => clientOptions.filter((address) => matchesSearch(address, clientSearch)),
-    [clientOptions, clientSearch]
-  );
-
-  const filteredVendorOptions = useMemo(
-    () => vendorOptions.filter((address) => matchesSearch(address, vendorSearch)),
-    [vendorOptions, vendorSearch]
-  );
-
-  function parseMoneySpent(value: string): number | null {
-    const trimmed = value.trim();
-    if (!trimmed) return 0;
-
-    const parsed = Number(trimmed);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-
-  function addRow(addressId: number, isVendor: boolean) {
+  async function addRow(addressId: number, isVendor: boolean) {
     const rows = isVendor ? vendorRows : clientRows;
     if (rows.some((row) => row.addressId === addressId)) {
       setStatus(`${isVendor ? "Vendor" : "Client"} already exists in this month.`);
@@ -134,63 +156,35 @@ export default function AddressesPage({
 
     if (!sourceAddress) return;
 
-    const nextRow: AddressMonthlySpend = {
-      ...sourceAddress,
-      id: null,
-      moneySpent: 0,
-      month,
-      year,
-    };
-
-    if (isVendor) {
-      setVendorRows((prev) => [...prev, nextRow]);
-    } else {
-      setClientRows((prev) => [...prev, nextRow]);
-    }
-
-    setDraftMoneySpent((prev) => ({
-      ...prev,
-      [addressId]: prev[addressId] ?? "0",
-    }));
-    setStatus("");
-  }
-
-  async function handleMoneySpentBlur(row: AddressMonthlySpend) {
-    const addressId = row.addressId;
-    const candidate = draftMoneySpent[addressId] ?? "0";
-    const parsed = parseMoneySpent(candidate);
-
-    if (parsed === null) {
-      setStatus("Please enter a valid number for this amount.");
-      setDraftMoneySpent((prev) => ({
-        ...prev,
-        [addressId]: String(row.moneySpent),
-      }));
-      return;
-    }
+    setStatus("Checking monthly tax code...");
 
     try {
-      const savedId = await upsertAddressMonthlySpend(addressId, month, year, parsed);
-      const touchedAt = new Date().toISOString();
+      const ensuredTaxCode = await ensureMonthlyTaxCodeForAddress({
+        addressId,
+        street: sourceAddress.street,
+        zipCode: sourceAddress.zipCode,
+        month,
+        year,
+      });
 
-      const updateRows = (rows: AddressMonthlySpend[]) =>
-        rows.map((address) =>
-          address.addressId === addressId
-            ? {
-                ...address,
-                id: savedId,
-                moneySpent: parsed,
-                month,
-                year,
-                lastUsed: touchedAt,
-              }
-            : address
+      const nextRow: AddressMonthlySpend = {
+        ...sourceAddress,
+        id: null,
+        moneySpent: 0,
+        totalTaxRate: ensuredTaxCode.totalTaxRate,
+        taxCode: ensuredTaxCode.taxCode,
+        month,
+        year,
+      };
+
+      if (isVendor) {
+        setVendorRows((prev) =>
+          prev.some((row) => row.addressId === addressId) ? prev : [...prev, nextRow]
         );
-
-      if (row.isVendor) {
-        setVendorRows(updateRows);
       } else {
-        setClientRows(updateRows);
+        setClientRows((prev) =>
+          prev.some((row) => row.addressId === addressId) ? prev : [...prev, nextRow]
+        );
       }
 
       setAllAddresses((prev) =>
@@ -198,11 +192,8 @@ export default function AddressesPage({
           address.addressId === addressId
             ? {
                 ...address,
-                id: savedId,
-                moneySpent: parsed,
-                month,
-                year,
-                lastUsed: touchedAt,
+                totalTaxRate: ensuredTaxCode.totalTaxRate,
+                taxCode: ensuredTaxCode.taxCode,
               }
             : address
         )
@@ -210,125 +201,287 @@ export default function AddressesPage({
 
       setDraftMoneySpent((prev) => ({
         ...prev,
-        [addressId]: String(parsed),
+        [addressId]: prev[addressId] ?? "0",
       }));
-      setStatus("Saved.");
+      setDirtyByAddressId((prev) => ({
+        ...prev,
+        [addressId]: false,
+      }));
+      setSavingByAddressId((prev) => ({
+        ...prev,
+        [addressId]: false,
+      }));
+      setStatus("");
     } catch (err) {
-      console.error("Save failed:", err);
-      setStatus("Could not save monthly amount.");
+      console.error("Failed to ensure tax code:", err);
+      const message =
+        err instanceof Error ? err.message : "Could not create monthly tax code.";
+      setStatus(message);
     }
   }
 
-  const columns: ColumnDef<AddressMonthlySpend>[] = [
-    { accessorKey: "name", header: "Name" },
-    { accessorKey: "street", header: "Street" },
-    { accessorKey: "zipCode", header: "Zip Code" },
-    {
-      accessorKey: "totalTaxRate",
-      header: "Tax Rate",
-      cell: ({ row }) => `${row.original.totalTaxRate}%`,
+  const handleDraftMoneyAmountChange = useCallback(
+    (row: AddressMonthlySpend, nextValue: string) => {
+      const persistedDisplayValue = getDisplayMoneyAmount(row.moneySpent);
+
+      setDraftMoneySpent((prev) => ({
+        ...prev,
+        [row.addressId]: nextValue,
+      }));
+      setDirtyByAddressId((prev) => ({
+        ...prev,
+        [row.addressId]: nextValue !== persistedDisplayValue,
+      }));
+      setStatus("");
     },
-    {
-      accessorKey: "moneySpent",
-      header: "Money Spent (+) / Made (-)",
-      cell: ({ row }) => (
-        <input
-          type="number"
-          step="0.01"
-          className="border px-2 py-1 rounded w-full"
-          value={draftMoneySpent[row.original.addressId] ?? "0"}
-          onChange={(event) =>
-            setDraftMoneySpent((prev) => ({
-              ...prev,
-              [row.original.addressId]: event.target.value,
-            }))
-          }
-          onBlur={() => {
-            void handleMoneySpentBlur(row.original);
-          }}
-        />
-      ),
+    []
+  );
+
+  const handleSaveMoneyAmount = useCallback(
+    async (row: AddressMonthlySpend) => {
+      const addressId = row.addressId;
+      if (savingByAddressIdRef.current[addressId]) return;
+
+      const candidate = draftMoneySpentRef.current[addressId] ?? "0";
+      const parsed = parseMoneySpent(candidate);
+
+      if (parsed === null) {
+        setStatus("Please enter a valid number for this amount.");
+        return;
+      }
+
+      const normalizedAmount = normalizeMoneyAmount(parsed, row.isVendor);
+      setSavingByAddressId((prev) => ({ ...prev, [addressId]: true }));
+
+      try {
+        const savedId = await upsertAddressMonthlySpend(
+          addressId,
+          month,
+          year,
+          normalizedAmount
+        );
+        const touchedAt = new Date().toISOString();
+
+        const updateRows = (rows: AddressMonthlySpend[]) =>
+          rows.map((address) =>
+            address.addressId === addressId
+              ? {
+                  ...address,
+                  id: savedId,
+                  moneySpent: normalizedAmount,
+                  month,
+                  year,
+                  lastUsed: touchedAt,
+                }
+              : address
+          );
+
+        if (row.isVendor) {
+          setVendorRows(updateRows);
+        } else {
+          setClientRows(updateRows);
+        }
+
+        setAllAddresses((prev) =>
+          prev.map((address) =>
+            address.addressId === addressId
+              ? {
+                  ...address,
+                  id: savedId,
+                  moneySpent: normalizedAmount,
+                  month,
+                  year,
+                  lastUsed: touchedAt,
+                }
+              : address
+          )
+        );
+
+        setDraftMoneySpent((prev) => ({
+          ...prev,
+          [addressId]: getDisplayMoneyAmount(normalizedAmount),
+        }));
+        setDirtyByAddressId((prev) => ({
+          ...prev,
+          [addressId]: false,
+        }));
+        setStatus("Saved.");
+      } catch (err) {
+        console.error("Save failed:", err);
+        setStatus("Could not save monthly amount.");
+      } finally {
+        setSavingByAddressId((prev) => ({
+          ...prev,
+          [addressId]: false,
+        }));
+      }
     },
-  ];
+    [month, year]
+  );
+
+  const buildColumns = useCallback(
+    (
+      amountHeader: string,
+      includeVendorDeduction: boolean
+    ): ColumnDef<AddressMonthlySpend>[] => {
+      const columns: ColumnDef<AddressMonthlySpend>[] = [
+        { accessorKey: "name", header: "Name" },
+        { accessorKey: "street", header: "Street" },
+        { accessorKey: "zipCode", header: "Zip Code" },
+        {
+          accessorKey: "totalTaxRate",
+          header: "Tax Rate",
+          cell: ({ row }) => `${row.original.totalTaxRate}%`,
+        },
+        {
+          accessorKey: "taxCode",
+          header: "Tax Code",
+          cell: ({ row }) => row.original.taxCode ?? "—",
+        },
+        {
+          accessorKey: "moneySpent",
+          header: amountHeader,
+          cell: ({ row }) => (
+            <input
+              type="number"
+              step="0.01"
+              min={0}
+              className="no-number-spinner border px-2 py-1 rounded w-full"
+              value={draftMoneySpentRef.current[row.original.addressId] ?? "0"}
+              onChange={(event) => {
+                handleDraftMoneyAmountChange(row.original, event.target.value);
+              }}
+            />
+          ),
+        },
+      ];
+
+      if (includeVendorDeduction) {
+        columns.push({
+          id: "deduction",
+          header: "Deduction",
+          cell: ({ row }) => {
+            const addressId = row.original.addressId;
+            const draftValue =
+              draftMoneySpentRef.current[addressId] ??
+              getDisplayMoneyAmount(row.original.moneySpent);
+            const parsed = parseMoneySpent(draftValue);
+            const moneySpent = parsed === null ? Math.abs(row.original.moneySpent) : Math.abs(parsed);
+            const deduction = calculateVendorDeduction(moneySpent, row.original.totalTaxRate);
+
+            return formatCurrency(deduction);
+          },
+        });
+      }
+
+      columns.push({
+        id: "save",
+        header: "Save",
+        enableSorting: false,
+        cell: ({ row }) => {
+          const addressId = row.original.addressId;
+          const isDirty = Boolean(dirtyByAddressIdRef.current[addressId]);
+          const isSaving = Boolean(savingByAddressIdRef.current[addressId]);
+
+          return (
+            <button
+              type="button"
+              className="!px-3 !py-1 rounded border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!isDirty || isSaving}
+              onClick={() => {
+                void handleSaveMoneyAmount(row.original);
+              }}
+            >
+              {isSaving ? "Saving..." : "Save"}
+            </button>
+          );
+        },
+      });
+
+      return columns;
+    },
+    [handleDraftMoneyAmountChange, handleSaveMoneyAmount]
+  );
+
+  const clientColumns = useMemo(
+    () => buildColumns("Money Made", false),
+    [buildColumns]
+  );
+  const vendorColumns = useMemo(
+    () => buildColumns("Money Spent", true),
+    [buildColumns]
+  );
 
   return (
     <>
       <section className="space-y-2 mb-10">
         <h2 className="on-white text-xl font-semibold">Clients</h2>
         <div className="flex flex-wrap items-center gap-2">
-          <input
-            type="search"
-            className="border px-2 py-1 rounded min-w-[260px]"
-            placeholder="Search clients..."
-            value={clientSearch}
-            onChange={(event) => setClientSearch(event.target.value)}
-          />
-          <select
-            className="border px-2 py-1 rounded min-w-[260px]"
-            value={selectedClientId}
-            onChange={(event) => setSelectedClientId(event.target.value)}
-          >
-            <option value="">Select a client</option>
-            {filteredClientOptions.map((client) => (
-              <option key={client.addressId} value={client.addressId}>
-                {client.name} ({client.zipCode})
-              </option>
-            ))}
-          </select>
-          <button
-            className="border rounded px-3 py-1"
-            disabled={!selectedClientId}
-            onClick={() => {
-              const parsedId = Number(selectedClientId);
-              if (Number.isFinite(parsedId)) {
-                addRow(parsedId, false);
+          <Autocomplete
+            options={clientOptions}
+            value={null}
+            inputValue={clientSearchInput}
+            onInputChange={(_, value) => setClientSearchInput(value)}
+            onChange={(_, value) => {
+              if (value) {
+                void addRow(value.addressId, false);
+                setClientSearchInput("");
               }
-              setSelectedClientId("");
             }}
-          >
-            Add Client
-          </button>
+            getOptionLabel={(option) => `${option.name} (${option.zipCode})`}
+            isOptionEqualToValue={(option, value) =>
+              option.addressId === value.addressId
+            }
+            filterOptions={(options, state) =>
+              options.filter((address) => matchesSearch(address, state.inputValue))
+            }
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Search clients"
+                placeholder="Type and choose a client to add"
+                size="small"
+              />
+            )}
+            sx={{ minWidth: 300 }}
+          />
         </div>
-        <Table data={clientRows} columns={columns} />
+        <Table data={clientRows} columns={clientColumns} />
       </section>
 
       <section className="space-y-2">
         <h2 className="on-white text-xl font-semibold">Vendors</h2>
         <div className="flex flex-wrap items-center gap-2">
-          <input
-            type="search"
-            className="border px-2 py-1 rounded min-w-[260px]"
-            placeholder="Search vendors..."
-            value={vendorSearch}
-            onChange={(event) => setVendorSearch(event.target.value)}
-          />
-          <select
-            className="border px-2 py-1 rounded min-w-[260px]"
-            value={selectedVendorId}
-            onChange={(event) => setSelectedVendorId(event.target.value)}
-          >
-            <option value="">Select a vendor</option>
-            {filteredVendorOptions.map((vendor) => (
-              <option key={vendor.addressId} value={vendor.addressId}>
-                {vendor.name} ({vendor.zipCode})
-              </option>
-            ))}
-          </select>
-          <button
-            className="border rounded px-3 py-1"
-            disabled={!selectedVendorId}
-            onClick={() => {
-              const parsedId = Number(selectedVendorId);
-              if (Number.isFinite(parsedId)) {
-                addRow(parsedId, true);
+          <Autocomplete
+            options={vendorOptions}
+            value={null}
+            inputValue={vendorSearchInput}
+            onInputChange={(_, value) => setVendorSearchInput(value)}
+            onChange={(_, value) => {
+              if (value) {
+                void addRow(value.addressId, true);
+                setVendorSearchInput("");
               }
-              setSelectedVendorId("");
             }}
-          >
-            Add Vendor
-          </button>
+            getOptionLabel={(option) => `${option.name} (${option.zipCode})`}
+            isOptionEqualToValue={(option, value) =>
+              option.addressId === value.addressId
+            }
+            filterOptions={(options, state) =>
+              options.filter((address) => matchesSearch(address, state.inputValue))
+            }
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Search vendors"
+                placeholder="Type and choose a vendor to add"
+                size="small"
+              />
+            )}
+            sx={{ minWidth: 300 }}
+          />
         </div>
-        <Table data={vendorRows} columns={columns} />
+        <Table data={vendorRows} columns={vendorColumns} />
       </section>
 
       {status && <p className="mt-2 text-sm on-white">{status}</p>}

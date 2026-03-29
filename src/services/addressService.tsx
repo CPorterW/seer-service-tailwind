@@ -1,23 +1,40 @@
 
 import { supabase } from '../lib/supabaseClient';
 import type { Address } from '../types/address';
+import {
+  ensureMonthlyTaxCodeForAddress,
+  getLatestTaxRatesByAddress,
+} from "./taxCodeService";
 
-export async function getAddresses() {
+type AddressRow = {
+  id: number;
+  name: string;
+  street: string;
+  zip_code: string;
+  last_used: string | null;
+  is_vendor: boolean;
+  created_at: string;
+};
+
+export async function getAddresses(): Promise<Address[]> {
   const { data, error } = await supabase
     .from("address")
-    .select("id, name, street, zip_code, last_used, is_vendor, total_tax_rate, created_at")
+    .select("id, name, street, zip_code, last_used, is_vendor, created_at")
     .order("id");
 
   if (error) throw error;
+  const addressRows = (data ?? []) as AddressRow[];
+  const addressIds = addressRows.map((address) => address.id);
+  const latestTaxRatesByAddress = await getLatestTaxRatesByAddress(addressIds);
 
-  return data.map((a) => ({
+  return addressRows.map((a) => ({
     id: a.id,
     name: a.name,
     street: a.street,
     zipCode: a.zip_code,
     lastUsed: a.last_used,
     isVendor: a.is_vendor,
-    totalTaxRate: a.total_tax_rate,
+    totalTaxRate: latestTaxRatesByAddress.get(a.id) ?? 0,
     createdDateTime: a.created_at
   }));
 }
@@ -38,14 +55,41 @@ export async function getAddressesByMonth(month: number, year: number): Promise<
   });
 }
 
-export async function createAddress(street: string, zip_code: string, name: string, is_vendor: boolean, total_tax_rate: number) {
+export async function createAddress(
+  street: string,
+  zip_code: string,
+  name: string,
+  is_vendor: boolean
+) {
+  const normalizedStreet = street.trim();
+  const normalizedZipCode = zip_code.trim();
+  const normalizedName = name.trim();
   const { data, error } = await supabase
     .from("address")
-    .insert({ street, zip_code, name, is_vendor, total_tax_rate })
-    .select()
+    .insert({
+      street: normalizedStreet,
+      zip_code: normalizedZipCode,
+      name: normalizedName,
+      is_vendor,
+    })
+    .select("id, street, zip_code")
     .single();
 
   if (error) throw error;
+
+  const createdAddress = data as {
+    id: number;
+    street: string;
+    zip_code: string;
+  };
+  const now = new Date();
+  await ensureMonthlyTaxCodeForAddress({
+    addressId: createdAddress.id,
+    street: createdAddress.street,
+    zipCode: createdAddress.zip_code,
+    month: now.getMonth() + 1,
+    year: now.getFullYear(),
+  });
   return data;
 }
 
