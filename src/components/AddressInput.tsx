@@ -5,9 +5,10 @@ import { createAddress } from "../services/addressService";
 
 type AddressInputProps = {
   isVendor: boolean;
+  onAddressCreated?: () => void;
 };
 
-export default function AddressInput({ isVendor }: AddressInputProps) {
+export default function AddressInput({ isVendor, onAddressCreated }: AddressInputProps) {
   const [street, setStreet] = useState("");
   const [zipCode, setZipCode] = useState("");
   const [name, setName] = useState("");
@@ -24,6 +25,7 @@ export default function AddressInput({ isVendor }: AddressInputProps) {
       setLoading(true);
       setStatus("Saving address and tax code...");
       await createAddress(street, zipCode, name, isVendor);
+      onAddressCreated?.();
 
       setStatus("Saved!");
       setStreet("");

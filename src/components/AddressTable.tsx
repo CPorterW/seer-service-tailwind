@@ -6,9 +6,10 @@ import { deleteAddress, getVendors, getClients } from "../services/addressServic
 
 type AddressesPageProps = {
   isVendor: boolean;
+  refreshToken?: number;
 };
 
-export default function AddressesPage({ isVendor }: AddressesPageProps) {
+export default function AddressesPage({ isVendor, refreshToken = 0 }: AddressesPageProps) {
 
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [contextRow, setContextRow] = useState<Row<Address> | null>(null);
@@ -25,7 +26,7 @@ export default function AddressesPage({ isVendor }: AddressesPageProps) {
     }
 
     load();
-  }, [isVendor]);
+  }, [isVendor, refreshToken]);
 
   const columns: ColumnDef<Address>[] = [
     { accessorKey: "name", header: "Name"},
