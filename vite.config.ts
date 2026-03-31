@@ -1,18 +1,20 @@
 // vite.config.ts
-import type { IncomingMessage, ServerResponse } from "node:http";
-import { defineConfig, loadEnv, type Plugin } from "vite";
+import type { IncomingMessage } from "node:http";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import tailwindcss from "@tailwindcss/vite";
+import usgeocoderHandler from "./api/usgeocoder.js";
+import taxLookupHandler from "./api/tax-lookup.js";
+
 type MiddlewareNext = (err?: unknown) => void;
-function sendJson(
-  res: ServerResponse<IncomingMessage>,
-  status: number,
-  body: Record<string, unknown>
-) {
-  res.statusCode = status;
-  res.setHeader("Content-Type", "application/json");
-  res.end(JSON.stringify(body));
-}
+
+type QueryValue = string | string[];
+type QueryParams = Record<string, QueryValue>;
+
+type LocalApiRequest = IncomingMessage & {
+  body?: unknown;
+  query: QueryParams;
+};
 
 function readRequestBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -26,202 +28,79 @@ function readRequestBody(req: IncomingMessage): Promise<string> {
   });
 }
 
-function parseAddress(rawBody: string): string | null {
-  try {
-    const parsed = JSON.parse(rawBody) as unknown;
-    if (!parsed || typeof parsed !== "object" || !("address" in parsed)) {
-      return null;
+function parseQueryParams(req: IncomingMessage): QueryParams {
+  const url = new URL(req.url ?? "/", "http://localhost");
+  const query: QueryParams = {};
+
+  for (const [key, value] of url.searchParams.entries()) {
+    const existing = query[key];
+    if (existing === undefined) {
+      query[key] = value;
+      continue;
     }
 
-    const address = (parsed as { address: unknown }).address;
-    if (typeof address !== "string") return null;
+    if (Array.isArray(existing)) {
+      existing.push(value);
+    } else {
+      query[key] = [existing, value];
+    }
+  }
 
-    const trimmed = address.trim();
-    return trimmed.length > 0 ? trimmed : null;
+  return query;
+}
+
+function parseBody(rawBody: string, contentTypeHeader: string | undefined): unknown {
+  if (!rawBody) return "";
+  if (!contentTypeHeader?.toLowerCase().includes("application/json")) {
+    return rawBody;
+  }
+
+  try {
+    return JSON.parse(rawBody) as unknown;
   } catch {
-    return null;
+    return rawBody;
   }
 }
 
-function normalizeServerPath(serverPath: string): string {
-  return serverPath.trim().replace(/\/+$/, "");
-}
-
-function geocoderMiddleware(serverPath: string, authKey: string) {
-  const normalizedServerPath = normalizeServerPath(serverPath);
-  const endpoint = normalizedServerPath.endsWith("/get_info.php")
-    ? normalizedServerPath
-    : `${normalizedServerPath}/get_info.php`;
-
-  return async (
-    req: IncomingMessage,
-    res: ServerResponse<IncomingMessage>,
-    next: MiddlewareNext
-  ) => {
-    const path = req.url?.split("?")[0];
-    if (path !== "/api/usgeocoder") {
-      next();
-      return;
-    }
-
-    if (req.method !== "GET") {
-      sendJson(res, 405, { error: "Method not allowed." });
-      return;
-    }
-
-    if (!normalizedServerPath) {
-      sendJson(res, 500, { error: "Server is missing USGEOCODER_SERVER_PATH." });
-      return;
-    }
-
-    if (!authKey) {
-      sendJson(res, 500, { error: "Server is missing USGEOCODER_KEY." });
-      return;
-    }
-
-    try {
-      const url = new URL(req.url ?? "/api/usgeocoder", "http://localhost");
-      const address = url.searchParams.get("address")?.trim();
-      const zipcode = url.searchParams.get("zipcode")?.trim();
-      const option = url.searchParams.get("option")?.trim();
-
-      if (!address || !zipcode) {
-        sendJson(res, 400, { error: "Both address and zipcode are required." });
-        return;
-      }
-
-      const params = new URLSearchParams({
-        address,
-        zipcode,
-        authkey: authKey,
-        format: "json",
-      });
-      if (option) {
-        params.set("option", option);
-      }
-
-      const upstream = await fetch(`${endpoint}?${params.toString()}`);
-      const payload = await upstream.text();
-
-      res.statusCode = upstream.status;
-      res.setHeader(
-        "Content-Type",
-        upstream.headers.get("content-type") ?? "application/json"
-      );
-      res.end(payload);
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Tax lookup request failed.";
-      sendJson(res, 502, { error: message });
-    }
-  };
-}
-
-function geocoderProxy(serverPath: string, authKey: string): Plugin {
-  const middleware = geocoderMiddleware(serverPath, authKey);
-
+function localApiMiddleware(): Plugin {
   return {
-    name: "geocoder-proxy",
+    name: "local-api-middleware",
     configureServer(server) {
-      server.middlewares.use(middleware);
-    },
-    configurePreviewServer(server) {
-      server.middlewares.use(middleware);
-    },
-  };
-}
+      server.middlewares.use(async (req, res, next: MiddlewareNext) => {
+        const path = req.url?.split("?")[0];
 
-function taxLookupMiddleware(apiKey: string) {
-  return async (
-    req: IncomingMessage,
-    res: ServerResponse<IncomingMessage>,
-    next: MiddlewareNext
-  ) => {
-    const path = req.url?.split("?")[0];
-    if (path !== "/api/tax-lookup") {
-      next();
-      return;
-    }
+        if (path !== "/api/usgeocoder" && path !== "/api/tax-lookup") {
+          next();
+          return;
+        }
 
-    if (req.method !== "POST") {
-      sendJson(res, 405, { error: "Method not allowed." });
-      return;
-    }
+        const localReq = req as LocalApiRequest;
+        localReq.query = parseQueryParams(req);
 
-    if (!apiKey) {
-      sendJson(res, 500, { error: "Server is missing USGEOCODER_KEY." });
-      return;
-    }
+        if (path === "/api/tax-lookup") {
+          const rawBody = await readRequestBody(req);
+          const contentType =
+            typeof req.headers["content-type"] === "string"
+              ? req.headers["content-type"]
+              : undefined;
+          localReq.body = parseBody(rawBody, contentType);
+        }
 
-    try {
-      const rawBody = await readRequestBody(req);
-      const address = parseAddress(rawBody);
+        try {
+          if (path === "/api/usgeocoder") {
+            await usgeocoderHandler(localReq, res);
+            return;
+          }
 
-      if (!address) {
-        sendJson(res, 400, { error: "Address is required." });
-        return;
-      }
-
-      const params = new URLSearchParams({
-        address,
-        format: "json",
-        zip4: "n",
-        api_key: apiKey,
+          await taxLookupHandler(localReq, res);
+        } catch (error: unknown) {
+          next(error);
+        }
       });
-      const upstream = await fetch(
-        `https://usgeocoder.com/api/get_info.php?${params.toString()}`
-      );
-      const payload = await upstream.text();
-
-      res.statusCode = upstream.status;
-      res.setHeader(
-        "Content-Type",
-        upstream.headers.get("content-type") ?? "application/json"
-      );
-      res.end(payload);
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Tax lookup request failed.";
-      sendJson(res, 502, { error: message });
-    }
-  };
-}
-
-function taxLookupProxy(apiKey: string): Plugin {
-  const middleware = taxLookupMiddleware(apiKey);
-
-  return {
-    name: "tax-lookup-proxy",
-    configureServer(server) {
-      server.middlewares.use(middleware);
-    },
-    configurePreviewServer(server) {
-      server.middlewares.use(middleware);
     },
   };
 }
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), "");
-  const geocoderServerPath =
-    env.USGEOCODER_SERVER_PATH ||
-    process.env.USGEOCODER_SERVER_PATH ||
-    env.VITE_USGEOCODER_BASE_URL ||
-    process.env.VITE_USGEOCODER_BASE_URL ||
-    "https://api.usgeocoder.com/api";
-  const geocoderApiKey =
-    env.USGEOCODER_KEY ||
-    process.env.USGEOCODER_KEY ||
-    env.VITE_USGEOCODER_KEY ||
-    process.env.VITE_USGEOCODER_KEY ||
-    "";
-
-  return {
-    plugins: [
-      react(),
-      tailwindcss(),
-      geocoderProxy(geocoderServerPath, geocoderApiKey),
-      taxLookupProxy(geocoderApiKey),
-    ],
-  };
+export default defineConfig({
+  plugins: [react(), tailwindcss(), localApiMiddleware()],
 });
